@@ -1,4 +1,4 @@
-<index html>
+<index.html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -15,10 +15,6 @@
   Your app will be live at: https://YOUR_PROJECT.web.app
 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root{
   --pri:#2d1b69;--pri2:#5b2d8e;--acc:#00b4d8;
@@ -209,8 +205,7 @@ tr:hover td{background:#f8f6ff;}
       </div>
     </div>
 
-    <div id="recaptcha-container" style="margin-top:.5rem"></div>
-<div class="login-err" id="loginErr"></div>
+    <div class="login-err" id="loginErr"></div>
 
   </div>
 </div>
@@ -248,7 +243,6 @@ tr:hover td{background:#f8f6ff;}
     <div class="m-foot" id="mFoot"></div>
   </div>
 </div>
-
 <script>
 // ═══════════ DATA ═══════════
 // ═══════════ FIREBASE CONFIG ═══════════
@@ -318,18 +312,14 @@ function initFirebase(){
 function setupRecaptcha(){
   if(!FB_READY || !fbAuth) return;
   try {
-    if(recaptchaVerifier) return; // already set up
-    recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-      'size': 'normal',
+    if(recaptchaVerifier) return;
+    // Use INVISIBLE recaptcha — no user interaction needed
+    recaptchaVerifier = new firebase.auth.RecaptchaVerifier('sendOtpBtn', {
+      'size': 'invisible',
       'callback': function(response) {
-        // reCAPTCHA solved — enable send OTP button
-        document.getElementById('sendOtpBtn').disabled = false;
-      },
-      'expired-callback': function() {
-        document.getElementById('sendOtpBtn').disabled = true;
+        console.log('reCAPTCHA verified');
       }
     });
-    recaptchaVerifier.render();
   } catch(e) {
     console.warn('reCAPTCHA setup error:', e);
   }
@@ -373,6 +363,8 @@ function saveToLocal(){
     localStorage.setItem('sav_nextSID', nextSID);
     localStorage.setItem('sav_nextMID', nextMID);
     localStorage.setItem('sav_locked', JSON.stringify(LOCKED_COLS));
+    // Save current user session
+    if(CU) localStorage.setItem('sav_cu', JSON.stringify(CU));
     // Also save to Firebase if connected
     if(FB_READY && db){
       db.ref('app_data').set({
@@ -449,7 +441,6 @@ function switchRole(r){
   document.getElementById('masterSec').classList.toggle('hidden',r==='auditor');
   document.getElementById('auditorSec').classList.toggle('hidden',r==='master');
   document.getElementById('loginErr').textContent='';
-  // Setup reCAPTCHA when auditor tab shown
   if(r==='auditor') setTimeout(setupRecaptcha, 100);
   var cd=document.getElementById('credDisp');
   if(cd){
@@ -533,7 +524,8 @@ function sendOTP(){
   err.textContent = '';
 
   // Use Firebase Phone Auth if available
-  if(FB_READY && fbAuth && recaptchaVerifier){
+  if(FB_READY && fbAuth){
+    if(!recaptchaVerifier) setupRecaptcha();
     err.textContent = 'Sending OTP...';
     fbAuth.signInWithPhoneNumber(phoneWithCode, recaptchaVerifier)
       .then(function(result){
@@ -637,6 +629,7 @@ function backToPhone(){
 function doLogout(){
   if(CU&&CU.role==='auditor') delete ONLINE[CU.username];
   CU=null;
+  localStorage.removeItem('sav_cu');
   document.getElementById('appWrap').style.display='none';
   document.getElementById('loginWrap').style.display='flex';
   document.getElementById('mUser').value='';
@@ -681,6 +674,8 @@ function launch(){
 }
 
 function _doLaunch(){
+  // Save session so refresh doesn't log out
+  if(CU) localStorage.setItem('sav_cu', JSON.stringify(CU));
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('appWrap').style.display='flex';
   document.getElementById('roleLabel').textContent=CU.role==='master'?'Master Panel':'Auditor Panel';
@@ -1889,12 +1884,40 @@ function dlUsers(){
 }
 
 // ── Init on page load ──
-window.addEventListener('load', function(){
+function startApp(){
+  if(window._appStarted) return;
+  window._appStarted = true;
   initFirebase();
-  // Default to auditor tab
+  // Check if user was already logged in
+  try {
+    var savedCU = localStorage.getItem('sav_cu');
+    if(savedCU){
+      CU = JSON.parse(savedCU);
+      if(CU && CU.name && CU.role){
+        launch();
+        return;
+      }
+    }
+  } catch(e){ localStorage.removeItem('sav_cu'); }
   switchRole('auditor');
+}
+
+// startApp() is called after Firebase SDKs load (see bottom of file)
+// Fallback: if Firebase not used, start on load
+window.addEventListener('load', function(){
+  if(!FB_READY && !window._appStarted){
+    startApp();
+  }
 });
 
+</script>
+<!-- Firebase SDKs - load LAST so they are available when startApp() runs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// This runs AFTER Firebase SDKs are loaded
+startApp();
 </script>
 </body>
 </html>
