@@ -288,21 +288,35 @@ function initFirebase(){
         db.ref('master_credentials').set({username:MASTER.u, password:MASTER.p});
       }
     });
-    // Listen for real-time data changes (so auditors see master updates instantly)
-    db.ref('app_data').on('value', function(snap){
+    // Real-time listeners for each data path
+    db.ref('stock').on('value', function(snap){
       var data = snap.val();
-      if(!data || !CU) return; // only update if logged in
-      if(data.stock) STOCK = data.stock.filter(function(s){return s&&s.id;});
-      if(data.menus){
-        MENUS = data.menus.filter(function(m){return m&&m.id;});
+      if(!CU) return;
+      if(data) STOCK = Object.values(data).filter(function(s){return s&&s.id;});
+      else STOCK = [];
+      if(PAGE) go(PAGE);
+    });
+    db.ref('menus').on('value', function(snap){
+      var data = snap.val();
+      if(!CU) return;
+      if(data){
+        MENUS = Object.values(data).filter(function(m){return m&&m.id;});
         MENUS.forEach(function(m){if(!Array.isArray(m.subs))m.subs=[];});
       }
-      if(data.auditors) AUDITORS = data.auditors.filter(function(a){return a&&a.id;});
+      if(PAGE) go(PAGE);
+    });
+    db.ref('auditors').on('value', function(snap){
+      var data = snap.val();
+      if(!CU) return;
+      if(data) AUDITORS = Object.values(data).filter(function(a){return a&&a.id;});
+      if(PAGE) go(PAGE);
+    });
+    db.ref('meta').on('value', function(snap){
+      var data = snap.val();
+      if(!data) return;
       if(data.nextSID) nextSID = parseInt(data.nextSID)||1;
       if(data.nextMID) nextMID = parseInt(data.nextMID)||8;
       if(data.locked) LOCKED_COLS = data.locked;
-      // Refresh current page to show updated data
-      if(PAGE) go(PAGE);
     });
   } catch(e) {
     console.warn('Firebase init error:', e);
@@ -365,21 +379,21 @@ function saveToLocal(){
     localStorage.setItem('sav_locked', JSON.stringify(LOCKED_COLS));
     // Save current user session
     if(CU) localStorage.setItem('sav_cu', JSON.stringify(CU));
-    // Also save to Firebase if connected
+    // Save to Firebase
     if(FB_READY && db){
-      db.ref('app_data').set({
-        stock: STOCK,
-        menus: MENUS,
-        auditors: AUDITORS,
-        nextSID: nextSID,
-        nextMID: nextMID,
-        locked: LOCKED_COLS,
-        lastUpdated: new Date().toISOString()
-      }).catch(function(e){ console.warn('Firebase save error:',e); });
+      var stockObj={}; for(var i=0;i<STOCK.length;i++) stockObj[STOCK[i].id]=STOCK[i]; db.ref('stock').set(stockObj).catch(function(e){console.warn('FB stock save:',e);});
+      var menusObj={}; for(var i=0;i<MENUS.length;i++) menusObj[i]=MENUS[i]; db.ref('menus').set(menusObj).catch(function(e){console.warn('FB menus save:',e);});
+      var audObj={}; for(var i=0;i<AUDITORS.length;i++) audObj[AUDITORS[i].id]=AUDITORS[i]; db.ref('auditors').set(audObj).catch(function(e){console.warn('FB auditors save:',e);});
+      db.ref('meta').set({nextSID:nextSID,nextMID:nextMID,locked:LOCKED_COLS,updated:Date.now()}).catch(function(e){console.warn('FB meta save:',e);});
     }
     var badge=document.getElementById('fbBadge');
-    if(badge) badge.innerHTML='<span style="color:var(--ok)">&#9679;</span> '+(FB_READY?'Firebase Saved':'Saved locally');
-    setTimeout(function(){var b=document.getElementById('fbBadge');if(b)b.innerHTML='<span style="color:var(--ok)">&#9679;</span> '+(FB_READY?'Firebase Live':'Local');},2000);
+    if(badge){
+      badge.innerHTML='<span style="color:var(--ok)">&#9679;</span> '+(FB_READY?'Saving...':'Saving...');
+      setTimeout(function(){
+        var b=document.getElementById('fbBadge');
+        if(b) b.innerHTML='<span style="color:var(--ok)">&#9679;</span> '+(FB_READY?'Firebase Live':'Local');
+      },1500);
+    }
   }catch(e){console.warn('Save error:',e);}
 }
 
@@ -640,33 +654,51 @@ function doLogout(){
 function launch(){
   // Try Firebase first, fallback to localStorage
   if(FB_READY && db){
-    db.ref('app_data').once('value').then(function(snap){
+    // Load all data in parallel from Firebase
+    var loaded = {stock:false, menus:false, auditors:false, meta:false};
+    function tryLaunch(){
+      if(loaded.stock && loaded.menus && loaded.auditors && loaded.meta) _doLaunch();
+    }
+    db.ref('stock').once('value').then(function(snap){
       var data = snap.val();
       if(data){
-        if(data.stock) STOCK = data.stock;
-        if(data.menus) MENUS = data.menus;
-        if(data.auditors) AUDITORS = data.auditors;
+        var vals = Object.values(data);
+        STOCK = vals.filter(function(s){return s&&s.id;});
+        localStorage.setItem('sav_stock', JSON.stringify(STOCK));
+      }
+      loaded.stock = true; tryLaunch();
+    }).catch(function(){ loaded.stock=true; tryLaunch(); });
+
+    db.ref('menus').once('value').then(function(snap){
+      var data = snap.val();
+      if(data){
+        var vals = Object.values(data);
+        MENUS = vals.filter(function(m){return m&&m.id;});
+        MENUS.forEach(function(m){if(!Array.isArray(m.subs))m.subs=[];});
+        localStorage.setItem('sav_menus', JSON.stringify(MENUS));
+      }
+      loaded.menus = true; tryLaunch();
+    }).catch(function(){ loaded.menus=true; tryLaunch(); });
+
+    db.ref('auditors').once('value').then(function(snap){
+      var data = snap.val();
+      if(data){
+        var vals = Object.values(data);
+        AUDITORS = vals.filter(function(a){return a&&a.id;});
+        localStorage.setItem('sav_auditors', JSON.stringify(AUDITORS));
+      }
+      loaded.auditors = true; tryLaunch();
+    }).catch(function(){ loaded.auditors=true; tryLaunch(); });
+
+    db.ref('meta').once('value').then(function(snap){
+      var data = snap.val();
+      if(data){
         if(data.nextSID) nextSID = parseInt(data.nextSID)||1;
         if(data.nextMID) nextMID = parseInt(data.nextMID)||8;
         if(data.locked) LOCKED_COLS = data.locked;
-        // Sanitize
-        MENUS = MENUS.filter(function(m){return m&&m.id;});
-        MENUS.forEach(function(m){if(!Array.isArray(m.subs))m.subs=[];});
-        STOCK = STOCK.filter(function(s){return s&&s.id;});
-        console.log('Loaded from Firebase');
-        // Also save to localStorage as backup
-        localStorage.setItem('sav_stock', JSON.stringify(STOCK));
-        localStorage.setItem('sav_menus', JSON.stringify(MENUS));
-        localStorage.setItem('sav_auditors', JSON.stringify(AUDITORS));
-      } else {
-        loadFromLocal();
       }
-      _doLaunch();
-    }).catch(function(e){
-      console.warn('Firebase load failed, using localStorage:', e);
-      loadFromLocal();
-      _doLaunch();
-    });
+      loaded.meta = true; tryLaunch();
+    }).catch(function(){ loaded.meta=true; tryLaunch(); });
     return;
   }
   loadFromLocal();
