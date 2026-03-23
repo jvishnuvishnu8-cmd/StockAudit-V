@@ -345,7 +345,7 @@ var MASTER={u:'Vishnu27',p:'Vishnu@27'};
 
 var AUDITORS=[];
 (function(){
-  for(var i=1;i<=40;i++){
+  for(var i=1;i<=50;i++){
     var n=i<10?'0'+i:''+i;
     AUDITORS.push({id:i,username:'auditor'+n,password:'Audit@'+n,name:'Auditor '+n,phone:'',location:'',assignedMenuId:null,lastLogin:''});
   }
@@ -806,48 +806,190 @@ function pgMDash(){
   var compVal=0;
   for(var i=0;i<STOCK.length;i++) if(STOCK[i].st==='submitted') compVal+=STOCK[i].amt;
   var td=STOCK.filter(function(s){return s.date===today();});
-  // Login log
-  var logRows='';
-  for(var i=0;i<AUDITORS.length;i++){
-    var a=AUDITORS[i];
-    var isOn=!!ONLINE[a.username];
-    if(!isOn&&!a.lastLogin) continue;
-    var aml=a.assignedMenuId?menuById(a.assignedMenuId):null; var loc=aml?aml.name:'All';
-    logRows+='<tr>'
-      +'<td><b>'+a.name+'</b></td>'
-      +'<td style="color:var(--acc);font-family:monospace">'+a.username+'</td>'
-      +'<td style="font-family:monospace">'+(a.phone||'—')+'</td>'
-      +'<td><span class="badge '+(isOn?'b-ok':'b-pend')+'">'+(isOn?'Online':'Offline')+'</span></td>'
-      +'<td>'+loc+'</td>'
-      +'<td style="font-size:11px;color:var(--muted)">'+(a.lastLogin||'—')+'</td>'
-      +'<td><button class="btn btn-pri btn-sm" onclick="quickAssign('+a.id+')"> Assign</button></td>'
+  
+  // Calculate completion percentage
+  var completionPct = tot > 0 ? Math.round((sub / tot) * 100) : 0;
+  
+  // Audit Summary by Location
+  var locSummary = '';
+  for(var mi=0;mi<MENUS.length;mi++){
+    var m=MENUS[mi];
+    if(!m||!m.id) continue;
+    var locItems=STOCK.filter(function(s){return s.mid===m.id;});
+    var locSub=0, locPro=0, locPen=0;
+    for(var k=0;k<locItems.length;k++){
+      if(locItems[k].st==='submitted')locSub++;
+      else if(locItems[k].st==='process')locPro++;
+      else locPen++;
+    }
+    var locPct = locItems.length > 0 ? Math.round((locSub / locItems.length) * 100) : 0;
+    locSummary+='<tr>'
+      +'<td><b>'+m.name+'</b></td>'
+      +'<td style="text-align:center"><span class="badge b-pend">'+locItems.length+'</span></td>'
+      +'<td style="text-align:center"><span class="badge b-ok">'+locSub+'</span></td>'
+      +'<td style="text-align:center"><span class="badge b-warn">'+locPro+'</span></td>'
+      +'<td style="text-align:center"><span class="badge">'+locPen+'</span></td>'
+      +'<td><div style="background:#e0d4ff;border-radius:3px;height:6px;width:100px;overflow:hidden;display:inline-block">'
+      +'<div style="background:var(--pri2);height:100%;width:'+locPct+'%"></div></div></td>'
+      +'<td style="text-align:center;font-weight:600">'+locPct+'%</td>'
       +'</tr>';
   }
-  var loginTable=logRows
-    ?'<table><thead><tr><th>Name</th><th>Username</th><th>Phone</th><th>Status</th><th>Location</th><th>Last Login</th><th>Assign</th></tr></thead><tbody>'+logRows+'</tbody></table>'
-    :'<p style="padding:1rem;color:var(--muted)">No auditor activity yet</p>';
-  return '<div class="stat-row">'
-    +'<div class="stat-card"><div class="lbl">Total Items</div><div class="val">'+tot+'</div></div>'
-    +'<div class="stat-card"><div class="lbl">Submitted</div><div class="val" style="color:var(--ok)">'+sub+'</div></div>'
-    +'<div class="stat-card"><div class="lbl">In Process</div><div class="val" style="color:var(--warn)">'+pro+'</div></div>'
-    +'<div class="stat-card"><div class="lbl">Pending</div><div class="val" style="color:var(--muted)">'+pen+'</div></div>'
-    +'<div class="stat-card"><div class="lbl">Stock Value</div><div class="val" style="font-size:16px">₹'+val.toLocaleString()+'</div></div>'
-    +'<div class="stat-card"><div class="lbl">Completed Value</div><div class="val" style="font-size:14px;color:var(--ok)">₹'+compVal.toLocaleString()+'</div></div>'
-    +'</div>'
-    +'<div class="card"><div class="card-hdr"><b>Today\'s Activity ('+td.length+' entries)</b>'
-    +'<button class="btn btn-ok btn-sm" onclick="dlExcel()">⬇ Download Excel</button></div>'
-    +'<div class="tbl-wrap">'+tbl(td,false,true)+'</div></div>'
-    +'<div class="card"><div class="card-hdr"><b>Auditor Activity</b></div>'
-    +'<div class="tbl-wrap">'+loginTable+'</div></div>';
+  
+  // Daily Status Summary
+  var dailySummary = '';
+  var todayItems = STOCK.filter(function(s){return s.date===today();});
+  var todaySub=0, todayPro=0, todayPen=0;
+  for(var k=0;k<todayItems.length;k++){
+    if(todayItems[k].st==='submitted')todaySub++;
+    else if(todayItems[k].st==='process')todayPro++;
+    else todayPen++;
+  }
+  
+  // Auditor Performance
+  var auditorPerf = '';
+  for(var i=0;i<AUDITORS.length;i++){
+    var a=AUDITORS[i];
+    var audItems=STOCK.filter(function(s){return s.aud===a.name;});
+    if(audItems.length===0) continue;
+    var audSub=0;
+    for(var k=0;k<audItems.length;k++) if(audItems[k].st==='submitted') audSub++;
+    var audPct = audItems.length > 0 ? Math.round((audSub / audItems.length) * 100) : 0;
+    var isOn=!!ONLINE[a.username];
+    auditorPerf+='<tr>'
+      +'<td><b>'+a.name+'</b></td>'
+      +'<td style="color:var(--acc);font-family:monospace">'+a.username+'</td>'
+      +'<td><span class="badge '+(isOn?'b-ok':'b-pend')+'">'+(isOn?'🟢 Online':'🔴 Offline')+'</span></td>'
+      +'<td style="text-align:center">'+audItems.length+'</td>'
+      +'<td style="text-align:center;color:var(--ok);font-weight:600">'+audSub+'</td>'
+      +'<td style="text-align:center">'+audPct+'%</td>'
+      +'<td style="font-size:11px;color:var(--muted)">'+(a.lastLogin||'—')+'</td>'
+      +'</tr>';
+  }
+  
+  return '<div>'
+    + '<!-- KPI SECTION -->'
+    + '<div class="stat-row" style="margin-bottom:1.5rem">'
+    + '<div class="stat-card"><div class="lbl">📊 Total Items</div><div class="val">'+tot+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">✅ Submitted</div><div class="val" style="color:var(--ok)">'+sub+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">'+Math.round((sub/tot)*100)+'%</div></div>'
+    + '<div class="stat-card"><div class="lbl">⏳ In Process</div><div class="val" style="color:var(--warn)">'+pro+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">⏸ Pending</div><div class="val" style="color:var(--muted)">'+pen+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">💰 Stock Value</div><div class="val" style="font-size:16px">₹'+val.toLocaleString()+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">🎯 Completed Value</div><div class="val" style="font-size:14px;color:var(--ok)">₹'+compVal.toLocaleString()+'</div></div>'
+    + '</div>'
+    
+    + '<!-- DAILY STATUS UPDATE -->'
+    + '<div class="card" style="margin-bottom:1.2rem">'
+    + '<div class="card-hdr"><b>📅 Daily Status Update - '+today()+'</b></div>'
+    + '<div style="padding:1rem;background:#f8f6ff">'
+    + '<div class="fr" style="gap:2rem">'
+    + '<div><span style="font-size:12px;color:var(--muted)">TODAY\'S ENTRIES</span><div style="font-size:24px;font-weight:700;color:var(--pri)">'+todayItems.length+'</div></div>'
+    + '<div><span style="font-size:12px;color:var(--muted)">SUBMITTED</span><div style="font-size:24px;font-weight:700;color:var(--ok)">'+todaySub+'</div></div>'
+    + '<div><span style="font-size:12px;color:var(--muted)">PROCESSING</span><div style="font-size:24px;font-weight:700;color:var(--warn)">'+todayPro+'</div></div>'
+    + '<div><span style="font-size:12px;color:var(--muted)">PENDING</span><div style="font-size:24px;font-weight:700;color:#999">'+todayPen+'</div></div>'
+    + '</div>'
+    + '</div>'
+    + '</div>'
+    
+    + '<!-- AUDIT SUMMARY BY LOCATION -->'
+    + '<div class="card" style="margin-bottom:1.2rem">'
+    + '<div class="card-hdr"><b>📍 Audit Summary by Location</b></div>'
+    + '<div class="tbl-wrap"><table>'
+    + '<thead><tr><th>Location</th><th>Total</th><th>✅ Done</th><th>⏳ Process</th><th>⏸ Pending</th><th>Progress</th><th>%</th></tr></thead>'
+    + '<tbody>'+locSummary+'</tbody>'
+    + '</table></div>'
+    + '</div>'
+    
+    + '<!-- AUDITOR PERFORMANCE -->'
+    + '<div class="card" style="margin-bottom:1.2rem">'
+    + '<div class="card-hdr"><b>👥 Auditor Performance</b></div>'
+    + '<div class="tbl-wrap"><table>'
+    + '<thead><tr><th>Auditor</th><th>Username</th><th>Status</th><th>Items</th><th>Submitted</th><th>Progress</th><th>Last Active</th></tr></thead>'
+    + '<tbody>'+auditorPerf+'</tbody>'
+    + '</table></div>'
+    + '</div>'
+    
+    + '<!-- TODAY\'S SUBMISSIONS -->'
+    + '<div class="card">'
+    + '<div class="card-hdr"><b>📝 Today\'s Submissions ('+td.length+' entries)</b>'
+    + '<button class="btn btn-ok btn-sm" onclick="dlExcel()">⬇ Download Excel</button></div>'
+    + '<div class="tbl-wrap">'+tbl(td,false,true)+'</div>'
+    + '</div>'
+    
+    + '</div>';
 }
-
-// ═══════════ MASTER: STOCK DATA ═══════════
-function pgMStock(f){
-  f=f||'';
-  var html='<div class="fr" style="margin-bottom:.8rem">'
-    +'<button class="btn btn-pri" onclick="addStkModal()">+ Add Item</button>'
-    +'<button class="btn btn-ok" onclick="showDownloadModal()">Download</button>'
-    +'</div>'
+  
+  // Auditor Performance
+  var auditorPerf = '';
+  for(var i=0;i<AUDITORS.length;i++){
+    var a=AUDITORS[i];
+    var audItems=STOCK.filter(function(s){return s.aud===a.name;});
+    if(audItems.length===0) continue;
+    var audSub=0;
+    for(var k=0;k<audItems.length;k++) if(audItems[k].st==='submitted') audSub++;
+    var audPct = audItems.length > 0 ? Math.round((audSub / audItems.length) * 100) : 0;
+    var isOn=!!ONLINE[a.username];
+    auditorPerf+='<tr>'
+      +'<td><b>'+a.name+'</b></td>'
+      +'<td style="color:var(--acc);font-family:monospace">'+a.username+'</td>'
+      +'<td><span class="badge '+(isOn?'b-ok':'b-pend')+'">'+(isOn?'🟢 Online':'🔴 Offline')+'</span></td>'
+      +'<td style="text-align:center">'+audItems.length+'</td>'
+      +'<td style="text-align:center;color:var(--ok);font-weight:600">'+audSub+'</td>'
+      +'<td style="text-align:center">'+audPct+'%</td>'
+      +'<td style="font-size:11px;color:var(--muted)">'+(a.lastLogin||'—')+'</td>'
+      +'</tr>';
+  }
+  
+  return '<div>'
+    + '<!-- KPI SECTION -->'
+    + '<div class="stat-row" style="margin-bottom:1.5rem">'
+    + '<div class="stat-card"><div class="lbl">📊 Total Items</div><div class="val">'+tot+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">✅ Submitted</div><div class="val" style="color:var(--ok)">'+sub+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">'+Math.round((sub/tot)*100)+'%</div></div>'
+    + '<div class="stat-card"><div class="lbl">⏳ In Process</div><div class="val" style="color:var(--warn)">'+pro+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">⏸ Pending</div><div class="val" style="color:var(--muted)">'+pen+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">💰 Stock Value</div><div class="val" style="font-size:16px">₹'+val.toLocaleString()+'</div></div>'
+    + '<div class="stat-card"><div class="lbl">🎯 Completed Value</div><div class="val" style="font-size:14px;color:var(--ok)">₹'+compVal.toLocaleString()+'</div></div>'
+    + '</div>'
+    
+    + '<!-- DAILY STATUS UPDATE -->'
+    + '<div class="card" style="margin-bottom:1.2rem">'
+    + '<div class="card-hdr"><b>📅 Daily Status Update - '+today()+'</b></div>'
+    + '<div style="padding:1rem;background:#f8f6ff">'
+    + '<div class="fr" style="gap:2rem">'
+    + '<div><span style="font-size:12px;color:var(--muted)">TODAY\'S ENTRIES</span><div style="font-size:24px;font-weight:700;color:var(--pri)">'+todayItems.length+'</div></div>'
+    + '<div><span style="font-size:12px;color:var(--muted)">SUBMITTED</span><div style="font-size:24px;font-weight:700;color:var(--ok)">'+todaySub+'</div></div>'
+    + '<div><span style="font-size:12px;color:var(--muted)">PROCESSING</span><div style="font-size:24px;font-weight:700;color:var(--warn)">'+todayPro+'</div></div>'
+    + '<div><span style="font-size:12px;color:var(--muted)">PENDING</span><div style="font-size:24px;font-weight:700;color:#999">'+todayPen+'</div></div>'
+    + '</div>'
+    + '</div>'
+    + '</div>'
+    
+    + '<!-- AUDIT SUMMARY BY LOCATION -->'
+    + '<div class="card" style="margin-bottom:1.2rem">'
+    + '<div class="card-hdr"><b>📍 Audit Summary by Location</b></div>'
+    + '<div class="tbl-wrap"><table>'
+    + '<thead><tr><th>Location</th><th>Total</th><th>✅ Done</th><th>⏳ Process</th><th>⏸ Pending</th><th>Progress</th><th>%</th></tr></thead>'
+    + '<tbody>'+locSummary+'</tbody>'
+    + '</table></div>'
+    + '</div>'
+    
+    + '<!-- AUDITOR PERFORMANCE -->'
+    + '<div class="card" style="margin-bottom:1.2rem">'
+    + '<div class="card-hdr"><b>👥 Auditor Performance</b></div>'
+    + '<div class="tbl-wrap"><table>'
+    + '<thead><tr><th>Auditor</th><th>Username</th><th>Status</th><th>Items</th><th>Submitted</th><th>Progress</th><th>Last Active</th></tr></thead>'
+    + '<tbody>'+auditorPerf+'</tbody>'
+    + '</table></div>'
+    + '</div>'
+    
+    + '<!-- TODAY'S SUBMISSIONS -->'
+    + '<div class="card">'
+    + '<div class="card-hdr"><b>📝 Today\'s Submissions ('+td.length+' entries)</b>'
+    + '<button class="btn btn-ok btn-sm" onclick="dlExcel()">⬇ Download Excel</button></div>'
+    + '<div class="tbl-wrap">'+tbl(td,false,true)+'</div>'
+    + '</div>'
+    
+    + '</div>';
+}
     +'<div class="sbox" style="margin-bottom:.8rem;width:100%">&#128269; '
     +'<input id="stockGlobalSrch" placeholder="Search all items..." style="width:85%"'
     +' oninput="stockSearchAll(this.value)"></div>'
