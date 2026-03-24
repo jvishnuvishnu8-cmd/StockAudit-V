@@ -404,7 +404,7 @@ function loadFromLocal(){
     var savedMenus=localStorage.getItem('sav_menus');
     if(savedMenus){
       var pm=JSON.parse(savedMenus);
-      // Sanitize: filter out null/     , ensure subs array
+      // Sanitize: filter out null/undefined, ensure subs array
       MENUS=pm.filter(function(x){return x&&x.id;}).map(function(x){
         return {id:parseInt(x.id)||x.id,name:x.name||'Location',subs:Array.isArray(x.subs)?x.subs:[]};
       });
@@ -995,7 +995,7 @@ function saveGUpload(encoded){
   var added=0;
   for(var i=1;i<data.length;i++){
     var row={};
-    hdrs.forEach(function(h,j){row[h]=data[i][j]!==    ?String(data[i][j]).trim():'';});
+    hdrs.forEach(function(h,j){row[h]=data[i][j]!==undefined?String(data[i][j]).trim():'';});
     if(!row['material']&&!row['description']&&!row['item name']) continue;
     var sQty=parseFloat(row['unrestricted stock']||row['system qty']||row['qty']||0)||0;
     var mapSpc=parseFloat(row['map/spc']||row['rate']||0)||0;
@@ -1209,7 +1209,7 @@ function dlReportExcel(){
     var s=items[i],ex=s.extra||{},m=menuById(s.mid);
     rows.push([m?m.name:'',s.sub,ex.material||s.sku,s.name,ex.plant||'',s.sQty,s.pQty!==null?s.pQty:'',s.disc!==null?s.disc:'',ex.mapSpc||s.rate,s.amt,s.disc!==null?(s.disc*(parseFloat(ex.mapSpc||s.rate)||0)).toFixed(2):'',ex.saaTeam||s.aud||'',ex.remarks||'',s.date,s.time,s.st,s.aud||'']);
   }
-  if(typeof XLSX!=='      '){
+  if(typeof XLSX!=='undefined'){
     var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});
     XLSX.utils.book_append_sheet(wb,ws,'Report');
@@ -1611,8 +1611,8 @@ function saveSubAdd(mid){
   m.subs.push({name:n,cols:ECOLS.slice()});
   // Lock all columns by default - auditors can only edit unlocked ones
   for(var i=0;i<ECOLS.length;i++) LOCKED_COLS['L'+mid+'_'+n+'_'+ECOLS[i]]=true;
-  // Unlock only Physical Quantity, 'Remarks by default
-  var editableCols=['Physical Quantity','Remarks'];
+  // Unlock only Physical Quantity, SAA Team, Remarks by default
+  var editableCols=['Physical Quantity','SAA Team','Remarks'];
   for(var i=0;i<editableCols.length;i++) delete LOCKED_COLS['L'+mid+'_'+n+'_'+editableCols[i]];
   saveToLocal(); closeModal(); go(PAGE);
 }
@@ -1672,7 +1672,7 @@ function saveSubCols(mid,idx){
 }
 
 function openSubUpload(mid,idx){
-  var m=menuById(mid); if(!m||!m.subs||m.subs[idx]===      ){alert('Sub location not found');return;} var nm=sn(m.subs[idx]),fid='sf_'+mid+'_'+idx;
+  var m=menuById(mid); if(!m||!m.subs||m.subs[idx]===undefined){alert('Sub location not found');return;} var nm=sn(m.subs[idx]),fid='sf_'+mid+'_'+idx;
   modal('Upload Excel — '+nm,
     '<div class="upzone" onclick="document.getElementById(\''+fid+'\').click()">'
     +'<div style="font-size:28px"></div>'
@@ -1714,12 +1714,12 @@ function handleSubUpload(ev,mid,idx){
 }
 
 function saveSubExcel(mid,idx,encoded){
-  var m=menuById(mid); if(!m||!m.subs||m.subs[idx]===    )return; var nm=sn(m.subs[idx]);
+  var m=menuById(mid); if(!m||!m.subs||m.subs[idx]===undefined)return; var nm=sn(m.subs[idx]);
   var data=JSON.parse(encoded);
   var hdrs=data[0].map(function(h){return String(h).trim().toLowerCase();}),added=0;
   for(var i=1;i<data.length;i++){
     var row={};
-    hdrs.forEach(function(h,j){row[h]=data[i][j]!==       ?String(data[i][j]).trim():'';});
+    hdrs.forEach(function(h,j){row[h]=data[i][j]!==undefined?String(data[i][j]).trim():'';});
     if(!row['material']&&!row['description']&&!row['item name']) continue;
     var sQty=parseFloat(row['unrestricted stock']||row['system qty']||row['qty']||0)||0;
     var mapSpc=parseFloat(row['map/spc']||row['rate']||0)||0;
@@ -1728,7 +1728,7 @@ function saveSubExcel(mid,idx,encoded){
     added++;
   }
   // Lock all cols except editable ones after upload
-  var editableCols2=['Physical Quantity','Remarks'];
+  var editableCols2=['Physical Quantity','SAA Team','Remarks'];
   for(var ci=0;ci<ECOLS.length;ci++){
     var ck='L'+mid+'_'+nm+'_'+ECOLS[ci];
     if(editableCols2.indexOf(ECOLS[ci])===-1) LOCKED_COLS[ck]=true;
@@ -1865,7 +1865,7 @@ function _doDownload(items,filename){
     var discVal=s.disc!==null?(s.disc*(parseFloat(ex.mapSpc||s.rate)||0)).toFixed(2):'';
     rows.push([m?m.name:'',s.sub,ex.material||s.sku,s.name,ex.plant||'',s.sQty,s.pQty!==null?s.pQty:'',s.disc!==null?s.disc:'',ex.mapSpc||s.rate,s.amt,discVal,ex.saaTeam||s.aud||'',ex.remarks||'',s.date||'',s.time||'',s.st,s.aud||'']);
   }
-  if(typeof XLSX!=='        '){
+  if(typeof XLSX!=='undefined'){
     var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});
     XLSX.utils.book_append_sheet(wb,ws,'Stock Audit');
@@ -1880,7 +1880,7 @@ function dlExcel(){
     var s=STOCK[i],ex=s.extra||{},m=menuById(s.mid);
     rows.push([m?m.name:'',s.sub,ex.material||s.sku,s.name,ex.plant||'',s.sQty,s.pQty!==null?s.pQty:'',s.disc!==null?s.disc:'',ex.mapSpc||s.rate,s.amt,s.disc!==null?(s.disc*(parseFloat(ex.mapSpc||s.rate)||0)).toFixed(2):'',ex.saaTeam||s.aud||'',ex.remarks||'',s.date||'',s.time||'',s.st,s.aud||'']);
   }
-  if(typeof XLSX!=='      '){
+  if(typeof XLSX!=='undefined'){
     var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});
     XLSX.utils.book_append_sheet(wb,ws,'Stock Audit');
@@ -1892,27 +1892,27 @@ function dlSubExcel(mid,subName){
   var items=STOCK.filter(function(s){return s.mid===mid&&s.sub===subName;});
   var rows=[['Sl.No','Material','Description','Plant','Storage Location','Unrestricted Stock','Storage Bin','MAP/SPC','Stock Values','Pur.Group','Pur.Group Des','Physical Quantity','Quantity Variance','Discrepancy Value','SAA Team','Remarks','DATE','TIME','Status','Auditor']];
   for(var i=0;i<items.length;i++){var s=items[i],ex=s.extra||{};rows.push([s.id,ex.material||s.sku,s.name,ex.plant||'',s.sub,s.sQty,ex.storageBin||'',ex.mapSpc||s.rate,s.amt,ex.purGroup||'',ex.purGroupDes||'',s.pQty!==null?s.pQty:'',s.disc!==null?s.disc:'',s.disc!==null?(s.disc*(parseFloat(ex.mapSpc||s.rate)||0)).toFixed(2):'',ex.saaTeam||s.aud||'',ex.remarks||'',s.date||'',s.time||'',s.st,s.aud||'']);}
-  if(typeof XLSX!=='      '){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});XLSX.utils.book_append_sheet(wb,ws,subName.substring(0,31));XLSX.writeFile(wb,subName+'_audit.xlsx');}
+  if(typeof XLSX!=='undefined'){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});XLSX.utils.book_append_sheet(wb,ws,subName.substring(0,31));XLSX.writeFile(wb,subName+'_audit.xlsx');}
 }
 
 function dlLocExcel(mid){
   var m=menuById(mid),items=STOCK.filter(function(s){return s.mid===parseInt(mid)||s.mid===mid;});
   var rows=[['Sl.No','Material','Description','Plant','Storage Location','Unrestricted Stock','Storage Bin','MAP/SPC','Stock Values','Physical Quantity','Quantity Variance','Discrepancy Value','SAA Team','Remarks','DATE','TIME','Status','Auditor']];
   for(var i=0;i<items.length;i++){var s=items[i],ex=s.extra||{};rows.push([s.id,ex.material||s.sku,s.name,ex.plant||'',s.sub,s.sQty,ex.storageBin||'',ex.mapSpc||s.rate,s.amt,s.pQty!==null?s.pQty:'',s.disc!==null?s.disc:'',s.disc!==null?(s.disc*(parseFloat(ex.mapSpc||s.rate)||0)).toFixed(2):'',ex.saaTeam||s.aud||'',ex.remarks||'',s.date||'',s.time||'',s.st,s.aud||'']);}
-  if(typeof XLSX!=='       '){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});XLSX.utils.book_append_sheet(wb,ws,(m?m.name:'Location').substring(0,31));XLSX.writeFile(wb,(m?m.name:'location')+'_audit.xlsx');}
+  if(typeof XLSX!=='undefined'){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map(function(h){return{wch:Math.max(String(h).length+2,12)};});XLSX.utils.book_append_sheet(wb,ws,(m?m.name:'Location').substring(0,31));XLSX.writeFile(wb,(m?m.name:'location')+'_audit.xlsx');}
 }
 
 function dlMyReport(){
   var mine=STOCK.filter(function(s){return s.aud===CU.name;});
   var rows=[['Material','Description','Sub Location','Sys Qty','Phy Qty','Variance','MAP/SPC','Stock Value','Disc Value','SAA Team','Remarks','Date','Time','Status']];
   for(var i=0;i<mine.length;i++){var s=mine[i],ex=s.extra||{};rows.push([ex.material||s.sku,s.name,s.sub,s.sQty,s.pQty!==null?s.pQty:'',s.disc!==null?s.disc:'',ex.mapSpc||s.rate,s.amt,s.disc!==null?(s.disc*(parseFloat(ex.mapSpc||s.rate)||0)).toFixed(2):'',ex.saaTeam||s.aud||'',ex.remarks||'',s.date||'',s.time||'',s.st]);}
-  if(typeof XLSX!=='     '){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'My Report');XLSX.writeFile(wb,CU.name+'_report.xlsx');}
+  if(typeof XLSX!=='undefined'){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'My Report');XLSX.writeFile(wb,CU.name+'_report.xlsx');}
 }
 
 function dlUsers(){
   var rows=[['ID','Name','Username','Password','Phone','Location','Assigned Location','Submissions']];
   for(var i=0;i<AUDITORS.length;i++){var a=AUDITORS[i],s=0;for(var k=0;k<STOCK.length;k++) if(STOCK[k].aud===a.name) s++;var loc=a.assignedMenuId?(menuById(a.assignedMenuId)||{name:'All'}).name:'All';rows.push([a.id,a.name,a.username,a.password,a.phone||'',a.location||'',loc,s]);}
-  if(typeof XLSX!=='      '){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Users');XLSX.writeFile(wb,'auditor_users.xlsx');}
+  if(typeof XLSX!=='undefined'){var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Users');XLSX.writeFile(wb,'auditor_users.xlsx');}
 }
 
 // ── Init on page load ──
