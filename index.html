@@ -1611,8 +1611,8 @@ function saveSubAdd(mid){
   m.subs.push({name:n,cols:ECOLS.slice()});
   // Lock all columns by default - auditors can only edit unlocked ones
   for(var i=0;i<ECOLS.length;i++) LOCKED_COLS['L'+mid+'_'+n+'_'+ECOLS[i]]=true;
-  // Unlock only Physical Quantity, SAA Team, Remarks by default
-  var editableCols=['Physical Quantity','SAA Team','Remarks'];
+  // Unlock only Physical Quantity, 'Remarks by default
+  var editableCols=['Physical Quantity','Remarks'];
   for(var i=0;i<editableCols.length;i++) delete LOCKED_COLS['L'+mid+'_'+n+'_'+editableCols[i]];
   saveToLocal(); closeModal(); go(PAGE);
 }
@@ -1728,7 +1728,7 @@ function saveSubExcel(mid,idx,encoded){
     added++;
   }
   // Lock all cols except editable ones after upload
-  var editableCols2=['Physical Quantity','SAA Team','Remarks'];
+  var editableCols2=['Physical Quantity','Remarks'];
   for(var ci=0;ci<ECOLS.length;ci++){
     var ck='L'+mid+'_'+nm+'_'+ECOLS[ci];
     if(editableCols2.indexOf(ECOLS[ci])===-1) LOCKED_COLS[ck]=true;
