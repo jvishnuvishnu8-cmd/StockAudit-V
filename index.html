@@ -1,4 +1,22 @@
 <index.html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║              STOCKAUDIT V — FIREBASE HOSTING STEPS              ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║  1. npm install -g firebase-tools                               ║
+  ║  2. firebase login                                              ║
+  ║  3. firebase init hosting                                       ║
+  ║       → Select your project: stockaudit-v                      ║
+  ║       → Public directory: . (current folder)                   ║
+  ║       → Single page app: YES                                   ║
+  ║       → Overwrite index.html: NO                               ║
+  ║  4. firebase deploy                                             ║
+  ║  Your app will be live at: https://stockaudit-v.web.app        ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║  MASTER LOGIN:  Vishnu27  /  Vishnu@27                         ║
+  ║  (These are hardcoded fallback — Firebase also stores them)     ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -37,14 +55,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .otp-row{display:flex;gap:6px;justify-content:center;margin:8px 0;}
 .otp-row input{width:42px;height:48px;text-align:center;font-size:22px;font-weight:700;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;outline:none;}
 .otp-row input:focus{border-color:var(--acc);}
-<!-- 
-  FIREBASE HOSTING STEPS:
-  1. npm install -g firebase-tools
-  2. firebase login
-  3. firebase init hosting (select your project, public dir = ".", single page app = yes)
-  4. firebase deploy
-  Your app will be live at: https://YOUR_PROJECT.web.app
--->
+
 /* APP LAYOUT */
 .app{display:none;min-height:100vh;flex-direction:row;}
 .sidebar{width:230px;background:linear-gradient(180deg,var(--pri) 0%,#1a0533 100%);color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .3s;}
@@ -473,22 +484,34 @@ function switchRole(r){
 
 function doLogin(){
   var u=document.getElementById('mUser').value.trim();
-  var p=document.getElementById('mPass').value.trim();
+  var p=document.getElementById('mPass').value; // do NOT trim — password may have spaces
   var err=document.getElementById('loginErr');
   if(!u||!p){err.textContent='Enter username and password';return;}
-  if(FB_READY&&db){
+
+  // ALWAYS check hardcoded master first — this is the guaranteed fallback
+  if(u===MASTER.u && p===MASTER.p){
+    CU={name:u,role:'master'};
+    launch();
+    return;
+  }
+
+  // If Firebase is live, also check if master changed credentials there
+  if(FB_READY && db){
+    err.textContent='Verifying...';
     db.ref('master_credentials').once('value').then(function(snap){
       var mc=snap.val();
-      var mu=mc?mc.username:MASTER.u, mp=mc?mc.password:MASTER.p;
-      if((u===mu&&p===mp)||(u===MASTER.u&&p===MASTER.p)){CU={name:u,role:'master'};launch();}
-      else document.getElementById('loginErr').textContent='Invalid master credentials';
-    }).catch(function(){
-      if(u===MASTER.u&&p===MASTER.p){CU={name:u,role:'master'};launch();}
-      else document.getElementById('loginErr').textContent='Invalid master credentials';
+      if(mc && u===mc.username && p===mc.password){
+        CU={name:u,role:'master'};
+        launch();
+      } else {
+        document.getElementById('loginErr').textContent='Invalid master credentials';
+      }
+    }).catch(function(e){
+      console.warn('Firebase login check error:',e);
+      document.getElementById('loginErr').textContent='Invalid master credentials';
     });
   } else {
-    if(u===MASTER.u&&p===MASTER.p){CU={name:u,role:'master'};launch();}
-    else err.textContent='Invalid master credentials';
+    err.textContent='Invalid master credentials';
   }
 }
 
